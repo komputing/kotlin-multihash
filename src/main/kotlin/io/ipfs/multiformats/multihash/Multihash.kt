@@ -1,10 +1,10 @@
 package io.ipfs.multiformats.multihash
 
-import io.ipfs.multiformats.multibase.BaseN
-import io.ipfs.multiformats.multibase.MultiBase
 import org.apache.commons.codec.binary.Base32
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.binary.Hex
+import org.komputing.kbase58.decodeBase58
+import org.komputing.kbase58.encodeToBase58String
 import java.math.BigInteger
 
 
@@ -47,7 +47,7 @@ class Multihash(val raw: ByteArray) {
      * @return returns the base58-encoded representation of a multihash.
      */
     fun toBase58String(): String {
-        return BaseN.encode(MultiBase.Base.BASE58_BTC.alphabet, BigInteger("58"), raw)
+        return raw.encodeToBase58String()
     }
 
     /**
@@ -89,7 +89,7 @@ class Multihash(val raw: ByteArray) {
          * @return parses a base58-encoded multihash.
          */
         fun fromBase58String(base58: String): Multihash {
-            val buf = BaseN.decode(MultiBase.Base.BASE58_BTC.alphabet, BigInteger("58"), base58)
+            val buf = base58.decodeBase58()
             return cast(buf)
         }
 

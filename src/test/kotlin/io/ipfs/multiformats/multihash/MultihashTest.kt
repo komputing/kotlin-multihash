@@ -157,6 +157,7 @@ class MultihashTest {
         }
     }
 
+
     @Test
     fun base32() {
         testCases.forEach {
@@ -182,7 +183,7 @@ class MultihashTest {
         }
     }
 
-    @Test(expected = IllegalStateException::class)
+    @Test(expected = NumberFormatException::class)
     fun decodeErrorInvalid() {
         val mh = Multihash.fromBase58String("/ipfs/QmQTw94j68Dgakgtfd45bG3TZG6CAfc427UVRH4mugg4q4")
     }
