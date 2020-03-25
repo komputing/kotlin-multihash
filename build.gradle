@@ -21,6 +21,8 @@ repositories {
 dependencies {
   implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlin_version"
   implementation 'com.github.komputing:kbin:0.1'
+  implementation 'com.github.komputing:kvarint:0.2'
+  implementation "com.squareup.okio:okio:2.4.0"
   implementation("com.github.komputing:kbase58:0.1")
   implementation group: 'commons-codec', name: 'commons-codec', version: '1.11'
 

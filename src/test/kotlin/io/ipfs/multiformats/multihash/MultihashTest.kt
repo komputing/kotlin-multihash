@@ -1,18 +1,26 @@
 package io.ipfs.multiformats.multihash
 
+import okio.Buffer
 import org.apache.commons.codec.binary.Base32
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.binary.Hex
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
-import java.io.IOException
+import org.komputing.kvarint.writeVarUInt
+import java.lang.IllegalArgumentException
 
+fun Int.encodeVarUInt() : ByteArray {
+    val buffer = Buffer()
+    buffer.writeVarUInt(toUInt())
+    return buffer.readByteArray()
+}
 /**
  * changjiashuai@gmail.com.
  *
  * Created by CJS on 2018/7/15.
  */
+@OptIn(ExperimentalUnsignedTypes::class)
 class MultihashTest {
 
     //code,name
@@ -55,7 +63,7 @@ class MultihashTest {
 
     fun toMultihash(triple: Triple<String, Int, String>): Multihash {
         val raw = Hex.decodeHex(triple.first)
-        val encode = Multihash.encode(raw, triple.second.toLong())
+        val encode = Multihash.encode(raw, triple.second.toUInt())
         return Multihash.cast(encode)
     }
 
@@ -63,9 +71,9 @@ class MultihashTest {
     fun encode() {
         testCases.forEach {
             val ob = Hex.decodeHex(it.first)
-            val excepted = VarInt.encodeVarint(it.second).plus(VarInt.encodeVarint(ob.size)).plus(ob)
+            val excepted = it.second.encodeVarUInt().plus(ob.size.encodeVarUInt()).plus(ob)
 
-            val actual = Multihash.encode(ob, it.second.toLong())
+            val actual = Multihash.encode(ob, it.second.toUInt())
             assertEquals(excepted.contentToString(), actual.contentToString())
 
             val actualByName = Multihash.encodeByName(ob, it.third)
@@ -88,12 +96,12 @@ class MultihashTest {
     fun decode() {
         testCases.forEach {
             val ob = Hex.decodeHex(it.first)
-            val excepted = VarInt.encodeVarint(it.second).plus(VarInt.encodeVarint(ob.size)).plus(ob)
+            val excepted = it.second.encodeVarUInt().plus(ob.size.encodeVarUInt()).plus(ob)
 
             val actual = Multihash.decode(excepted)
-            assertEquals(it.second.toLong(), actual.code)
+            assertEquals(it.second.toUInt(), actual.code)
             assertEquals(it.third, actual.name)
-            assertEquals(ob.size, actual.length)
+            assertEquals(ob.size.toUInt(), actual.length)
             assertEquals(ob.contentToString(), actual.digest.contentToString())
         }
     }
@@ -104,17 +112,17 @@ class MultihashTest {
         val mhBuf = Multihash.encodeByName(buf, "sha1")
         val o = Multihash.decode(mhBuf)
         val mhHex = Hex.encodeHexString(o.digest)
-        val actual = String.format("%s 0x%x %d %s", o.name, o.code, o.length, mhHex)
+        val actual = String.format("%s 0x%x %d %s", o.name, o.code.toInt(), o.length.toInt(), mhHex)
         val excepted = "sha1 0x11 20 0beec7b5ea3f0fdbc95d0dd47f3c5bc275da8a33"
         assertEquals(excepted, actual)
     }
 
     @Test
     fun testTable() {
-        tCodes.forEach { code, name ->
-            assertEquals(code.toLong(), Type.names[name])
+        tCodes.forEach { (code, name) ->
+            assertEquals(code.toUInt(), Type.names[name])
             if (name != "sha3" && name != "sha3-512") {
-                assertEquals(name, Type.codes[code.toLong()])
+                assertEquals(name, Type.codes[code.toUInt()])
             }
         }
     }
@@ -123,15 +131,15 @@ class MultihashTest {
     fun isValidCode() {
         for (i in 0..0xff) {
             val ok = tCodes[i] != null
-            assertEquals(Multihash.isAppCode(i.toLong()) || ok, Multihash.isValidCode(i.toLong()))
+            assertEquals(Multihash.isAppCode(i.toUInt()) || ok, Multihash.isValidCode(i.toUInt()))
         }
     }
 
     @Test
     fun isAppCode() {
         for (i in 0..0xff) {
-            val b = i >= 0 && i < 0x10
-            assertEquals(b, Multihash.isAppCode(i.toLong()))
+            val b = i in 0..15
+            assertEquals(b, Multihash.isAppCode(i.toUInt()))
         }
     }
 
@@ -139,7 +147,7 @@ class MultihashTest {
     fun cast() {
         testCases.forEach {
             val ob = Hex.decodeHex(it.first)
-            val excepted = VarInt.encodeVarint(it.second).plus(VarInt.encodeVarint(ob.size)).plus(ob)
+            val excepted = it.second.encodeVarUInt().plus(ob.size.encodeVarUInt()).plus(ob)
             assertNotNull(Multihash.cast(excepted))
             println("cast=${Multihash.cast(ob)}")
         }
@@ -149,7 +157,7 @@ class MultihashTest {
     fun hex() {
         testCases.forEach {
             val ob = Hex.decodeHex(it.first)
-            val buf = VarInt.encodeVarint(it.second).plus(VarInt.encodeVarint(ob.size)).plus(ob)
+            val buf = it.second.encodeVarUInt().plus(ob.size.encodeVarUInt()).plus(ob)
             val hexString = Hex.encodeHexString(buf)
             val mh = Multihash.fromHexString(hexString)
             assertEquals(buf.contentToString(), mh.raw.contentToString())
@@ -163,7 +171,7 @@ class MultihashTest {
         testCases.forEach {
             val base32 = Base32()
             val ob = base32.decode(it.first)
-            val buf = VarInt.encodeVarint(it.second).plus(VarInt.encodeVarint(ob.size)).plus(ob)
+            val buf = it.second.encodeVarUInt().plus(ob.size.encodeVarUInt()).plus(ob)
             val base32String = base32.encodeToString(buf)
             val mh = Multihash.fromBase32String(base32String)
             assertEquals(buf.contentToString(), mh.raw.contentToString())
@@ -175,7 +183,7 @@ class MultihashTest {
     fun base64() {
         testCases.forEach {
             val ob = Base64.decodeBase64(it.first)
-            val buf = VarInt.encodeVarint(it.second).plus(VarInt.encodeVarint(ob.size)).plus(ob)
+            val buf = it.second.encodeVarUInt().plus(ob.size.encodeVarUInt()).plus(ob)
             val base64String = Base64.encodeBase64String(buf)
             val mh = Multihash.fromBase64String(base64String)
             assertEquals(buf.contentToString(), mh.raw.contentToString())
@@ -188,15 +196,10 @@ class MultihashTest {
         val mh = Multihash.fromBase58String("/ipfs/QmQTw94j68Dgakgtfd45bG3TZG6CAfc427UVRH4mugg4q4")
     }
 
-    @Test(expected = IndexOutOfBoundsException::class)
+    @Test(expected = IllegalArgumentException::class)
     fun varintTooLong() {
         val tooLongBytes = byteArrayOf(129.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 128.toByte(), 129.toByte(), 1.toByte())
         Multihash.cast(tooLongBytes)
     }
 
-    @Test(expected = IOException::class)
-    fun varIntTooShort() {
-        val tooShortBytes = byteArrayOf(128.toByte(), 128.toByte(), 128.toByte())
-        Multihash.cast(tooShortBytes)
-    }
 }

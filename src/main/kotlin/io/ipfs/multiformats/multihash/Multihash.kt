@@ -1,11 +1,13 @@
 package io.ipfs.multiformats.multihash
 
+import okio.*
 import org.apache.commons.codec.binary.Base32
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.binary.Hex
 import org.komputing.kbase58.decodeBase58
 import org.komputing.kbase58.encodeToBase58String
-import java.math.BigInteger
+import org.komputing.kvarint.readVarUInt
+import org.komputing.kvarint.writeVarUInt
 
 
 /**
@@ -21,12 +23,14 @@ const val ERR_INVALID_MULTIHASH = "input isn't valid multihash"
 const val ERR_VARINT_BUFFER_SHORT = "uvarint: buffer too small"
 const val ERR_VARINT_TOO_LONG = "uvarint: varint too big (max 64bit)"
 
-data class DecodedMultihash(val code: Long, val name: String, val length: Int, val digest: ByteArray)
+@OptIn(ExperimentalUnsignedTypes::class)
+data class DecodedMultihash(val code: UInt, val name: String, val length: UInt, val digest: ByteArray)
 
 /**
  * Multihash is byte array with the following form:
  * <hash function code><digest size><hash function output>.
  */
+@OptIn(ExperimentalUnsignedTypes::class)
 class Multihash(val raw: ByteArray) {
 
     /**
@@ -65,8 +69,6 @@ class Multihash(val raw: ByteArray) {
     }
 
     companion object {
-
-        const val MAX_VARINT_LEN_64 = 10
 
         /**
          * @param s hex-encoded string
@@ -117,11 +119,15 @@ class Multihash(val raw: ByteArray) {
          * @param code hash function code
          * @return <hash function code varint><digest size varint><hash function output>
          */
-        fun encode(digest: ByteArray, code: Long): ByteArray {
+        fun encode(digest: ByteArray, code: UInt): ByteArray {
             if (!isValidCode(code)) {
                 throw IllegalStateException(ERR_UNKNOWN_CODE)
             }
-            return VarInt.encodeVarintLong(code).plus(VarInt.encodeVarintLong(digest.size.toLong())).plus(digest)
+            val buffer = Buffer() as BufferedSink
+            buffer.writeVarUInt(code.toUInt())
+            buffer.writeVarUInt(digest.size.toUInt())
+            buffer.write(digest)
+            return buffer.buffer.readByteArray()
         }
 
         fun encodeByName(buf: ByteArray, name: String): ByteArray {
@@ -130,40 +136,29 @@ class Multihash(val raw: ByteArray) {
         }
 
         fun decode(buf: ByteArray): DecodedMultihash {
+            val okIObuf: BufferedSource = buf.inputStream().source().buffer()
             if (buf.size < 2) {
                 throw IllegalStateException(ERR_TOO_SHORT)
             }
-            val (code, buf1) = uvarint(buf)
-            val (length, buf2) = uvarint(buf1)
-            if (length > Int.MAX_VALUE) {
-                throw IllegalStateException("digest too long, supporting only <= 2^31-1")
-            }
-            val name = Type.codes[code] ?: throw IllegalStateException(ERR_UNKNOWN_CODE)
-            val dm = DecodedMultihash(code, name, length.toInt(), buf2)
-            if (dm.digest.size != dm.length) {
+            val code = okIObuf.readVarUInt()
+            val length = okIObuf.readVarUInt()
+            val hash = okIObuf.readByteArray()
+            val name = Type.codes[code] ?: throw IllegalStateException(ERR_UNKNOWN_CODE + code)
+            val dm = DecodedMultihash(code, name, length, hash)
+            if (dm.digest.size.toUInt() != dm.length) {
                 throw IllegalStateException("multihash length inconsistent: $dm")
             }
             return dm
         }
 
-        fun uvarint(buf: ByteArray): Pair<Long, ByteArray> {
-            val (result, shift) = VarInt.decodeVarInt(buf)
-            if (shift == 0) {
-                throw IndexOutOfBoundsException(ERR_VARINT_BUFFER_SHORT)
-            } else {
-                val size = buf.size
-                return Pair(result, buf.sliceArray(IntRange(shift / 7, size - 1)))
-            }
-        }
-
-        fun isValidCode(code: Long): Boolean {
+        fun isValidCode(code: UInt): Boolean {
             if (isAppCode(code)) return true
             if (Type.hasCode(code)) return true
             return false
         }
 
-        fun isAppCode(code: Long): Boolean {
-            return code in 0 until 0x10  //[0, 16)
+        fun isAppCode(code: UInt): Boolean {
+            return code in 0U until 0x10U  //[0, 16)
         }
     }
 }
