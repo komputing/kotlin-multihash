@@ -1,6 +1,5 @@
 package io.ipfs.multiformats.multihash;
 
-@OptIn(ExperimentalUnsignedTypes::class)
 enum class Type(val code: UInt, val named: String, val length: UInt) {
 
     ID(0x0U, "id", 0U),

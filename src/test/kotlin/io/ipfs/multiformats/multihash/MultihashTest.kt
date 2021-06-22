@@ -20,7 +20,6 @@ fun Int.encodeVarUInt() : ByteArray {
  *
  * Created by CJS on 2018/7/15.
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 class MultihashTest {
 
     //code,name

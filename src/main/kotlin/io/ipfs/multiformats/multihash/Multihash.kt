@@ -23,14 +23,12 @@ const val ERR_INVALID_MULTIHASH = "input isn't valid multihash"
 const val ERR_VARINT_BUFFER_SHORT = "uvarint: buffer too small"
 const val ERR_VARINT_TOO_LONG = "uvarint: varint too big (max 64bit)"
 
-@OptIn(ExperimentalUnsignedTypes::class)
 data class DecodedMultihash(val code: UInt, val name: String, val length: UInt, val digest: ByteArray)
 
 /**
  * Multihash is byte array with the following form:
  * <hash function code><digest size><hash function output>.
  */
-@OptIn(ExperimentalUnsignedTypes::class)
 class Multihash(val raw: ByteArray) {
 
     /**
